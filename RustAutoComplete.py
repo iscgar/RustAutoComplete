@@ -59,6 +59,28 @@ class Racer:
         env = os.environ.copy()
         if 'RUST_SRC_PATH' in env:
             sys_src_paths.extend(env['RUST_SRC_PATH'].split(os.pathsep))
+        else:
+            # Append the active rustup toolchain path to the search
+            # paths if it's not already there (`get_rust_src_paths` should
+            # fix it up to point to the source if the rust-src component
+            # is installed for the active toolchain).
+            # This isn't the best course of action for everybody because
+            # cargo can invoke another toolchain, so we use it only if
+            # RUST_SRC_PATH isn't available.
+            try:
+                rustup_active_rustc = subprocess.check_output(
+                    ['rustup', 'which', 'rustc'],
+                    shell=not os.access(
+                        'rustup', os.X_OK)).decode('utf-8')[:-1]
+                rustup_active_rustc = os.path.split(
+                    os.path.dirname(
+                        os.path.expanduser(rustup_active_rustc)))[0]
+                if not any(
+                        os.path.abspath(p).startswith(rustup_active_rustc)
+                        for p in sys_src_paths):
+                    sys_src_paths.append(rustup_active_rustc)
+            except:
+                pass
 
         # fix for Mac
         # copy from https://github.com/int3h/SublimeFixMacPath
